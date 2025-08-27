@@ -19,30 +19,142 @@ public struct SolarDate: Equatable, Sendable {
     }
 }
 
-enum DataLoaderError: Error { case resourceNotFound, decodeFailed }
+enum DataLoaderError: Error { 
+    case resourceNotFound
+    case decodeFailed
+    case invalidYearRange
+}
+
+struct LunarTableMetadata: Codable {
+    let version: String
+    let source: String
+    let yearRange: YearRange
+    let lunarRange: DateRange
+    let gregorianRange: DateRange
+    let description: String
+    
+    enum CodingKeys: String, CodingKey {
+        case version, source, description
+        case yearRange = "year_range"
+        case lunarRange = "lunar_range"
+        case gregorianRange = "gregorian_range"
+    }
+}
+
+struct YearRange: Codable {
+    let start: Int
+    let end: Int
+}
+
+struct DateRange: Codable {
+    let start: String
+    let end: String
+}
+
+struct LunarConstants: Codable {
+    let lunarBigMonthDays: Int
+    let lunarSmallMonthDays: Int
+    let solarYearDays: Int
+    let lunarYearDays: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case lunarBigMonthDays = "lunar_big_month_days"
+        case lunarSmallMonthDays = "lunar_small_month_days"
+        case solarYearDays = "solar_year_days"
+        case lunarYearDays = "lunar_year_days"
+    }
+}
+
+struct BitEncoding: Codable {
+    let description: String
+    let bitPositions: BitPositions
+    let extractionFormulas: ExtractionFormulas
+    
+    enum CodingKeys: String, CodingKey {
+        case description
+        case bitPositions = "bit_positions"
+        case extractionFormulas = "extraction_formulas"
+    }
+}
+
+struct BitPositions: Codable {
+    let monthPattern: String
+    let intercalationMonth: String
+    let totalLunarDays: String
+    let solarLeapYear: String
+    
+    enum CodingKeys: String, CodingKey {
+        case monthPattern = "month_pattern"
+        case intercalationMonth = "intercalation_month"
+        case totalLunarDays = "total_lunar_days"
+        case solarLeapYear = "solar_leap_year"
+    }
+}
+
+struct ExtractionFormulas: Codable {
+    let intercalationMonth: String
+    let totalLunarDays: String
+    let solarLeapYear: String
+    let monthDays: String
+    
+    enum CodingKeys: String, CodingKey {
+        case intercalationMonth = "intercalation_month"
+        case totalLunarDays = "total_lunar_days"
+        case solarLeapYear = "solar_leap_year"
+        case monthDays = "month_days"
+    }
+}
+
+struct LunarTable: Codable {
+    let metadata: LunarTableMetadata
+    let constants: LunarConstants
+    let data: [UInt32]
+    let bitEncoding: BitEncoding
+    let usageNote: String
+    
+    enum CodingKeys: String, CodingKey {
+        case metadata, constants, data
+        case bitEncoding = "bit_encoding"
+        case usageNote = "usage_note"
+    }
+}
 
 final class DataLoader {
     static let shared = DataLoader()
     private(set) var isLoaded = false
-
-    // TODO: 추후 실제 구조로 바꿀 예정
-    private(set) var table: [String: Int] = [:]
-
+    private(set) var lunarTable: LunarTable?
+    
     private init() {}
-
+    
     func loadIfNeeded() throws {
         guard !isLoaded else { return }
         guard let url = Bundle.module.url(forResource: "lunar_table", withExtension: "json") else {
             throw DataLoaderError.resourceNotFound
         }
         let data = try Data(contentsOf: url)
-        // TODO: 우선 더미 파싱(실제 테이블 구조 정하면 Codable로 교체)
-        if let obj = try JSONSerialization.jsonObject(with: data) as? [String: Int] {
-            self.table = obj
+        do {
+            self.lunarTable = try JSONDecoder().decode(LunarTable.self, from: data)
             self.isLoaded = true
-        } else {
+        } catch {
             throw DataLoaderError.decodeFailed
         }
+    }
+    
+    func getData(for year: Int) throws -> UInt32 {
+        try loadIfNeeded()
+        guard let table = lunarTable else {
+            throw DataLoaderError.decodeFailed
+        }
+        
+        let startYear = table.metadata.yearRange.start
+        let endYear = table.metadata.yearRange.end
+        
+        guard year >= startYear && year <= endYear else {
+            throw DataLoaderError.invalidYearRange
+        }
+        
+        let index = year - startYear
+        return table.data[index]
     }
 }
 
@@ -57,10 +169,19 @@ public final class KoreanLunarCalendar: Sendable {
     public func setSolarDate(_ year: Int, _ month: Int, _ day: Int) -> Bool {
         do {
             try DataLoader.shared.loadIfNeeded()
-            // TODO: 변환 알고리즘 구현 (테이블 기반)
-            // 임시 스텁:
+            let yearData = try DataLoader.shared.getData(for: year)
+            
+            // 임시로 데이터 로드 성공 확인
             self.currentSolar = SolarDate(year: year, month: month, day: day)
-            // 변환 결과를 임시로 nil 처리. 구현 후 실제 값 세팅
+            
+            // 비트 연산으로 정보 추출 (임시 테스트)
+            let intercalationMonth = (yearData >> 12) & 0xF
+            let totalDays = (yearData >> 17) & 0x1FF
+            let isLeapYear = (yearData >> 30) & 0x1 == 1
+            
+            print("Year \(year): intercalation=\(intercalationMonth), totalDays=\(totalDays), isLeapYear=\(isLeapYear)")
+            
+            // TODO: 실제 변환 알고리즘 구현
             self.currentLunar = nil
             return true
         } catch {
@@ -73,8 +194,19 @@ public final class KoreanLunarCalendar: Sendable {
     public func setLunarDate(_ year: Int, _ month: Int, _ day: Int, _ intercalation: Bool) -> Bool {
         do {
             try DataLoader.shared.loadIfNeeded()
-            // TODO: 변환 알고리즘 구현
+            let yearData = try DataLoader.shared.getData(for: year)
+            
+            // 임시로 데이터 로드 성공 확인
             self.currentLunar = LunarDate(year: year, month: month, day: day, isLeapMonth: intercalation)
+            
+            // 비트 연산으로 정보 추출 (임시 테스트)
+            let intercalationMonth = (yearData >> 12) & 0xF
+            let totalDays = (yearData >> 17) & 0x1FF
+            let isLeapYear = (yearData >> 30) & 0x1 == 1
+            
+            print("Year \(year): intercalation=\(intercalationMonth), totalDays=\(totalDays), isLeapYear=\(isLeapYear)")
+            
+            // TODO: 실제 변환 알고리즘 구현
             self.currentSolar = nil
             return true
         } catch {
