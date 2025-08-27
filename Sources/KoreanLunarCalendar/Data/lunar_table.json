@@ -40,5 +40,5 @@
       "month_days": "((data >> (12 - month)) & 0x01) ? 30 : 29"
     }
   },
-  "usage_note": "This contains partial data (15 years). Complete implementation requires all 1051 values from years 1000-2050."
+  "usage_note": "This contains the complete data array (1051 values) for years 1000-2050, as described in the metadata."
 }
