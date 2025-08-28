@@ -25,7 +25,7 @@ enum DataLoaderError: Error {
     case invalidYearRange
 }
 
-struct LunarTableMetadata: Codable {
+internal struct LunarTableMetadata: Codable {
     let version: String
     let source: String
     let yearRange: YearRange
