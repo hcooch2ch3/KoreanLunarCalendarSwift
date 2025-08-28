@@ -54,17 +54,40 @@ let calendar = KoreanLunarCalendar()
 
 // 양력 -> 음력 변환
 calendar.setSolarDate(2024, 1, 1)
-print(calendar.lunarIsoFormat()) // 음력 날짜 출력
-print(calendar.getGapJaString()) // 간지 출력
+if let lunar = calendar.lunarIsoFormat() {
+    print("음력: \(lunar)")
+}
+if let gapja = calendar.getGapJaString() {
+    print("간지: \(gapja)")
+}
 
 // 음력 -> 양력 변환 (윤달 여부 포함)
 calendar.setLunarDate(2023, 12, 20, false) // 평달
-print(calendar.solarIsoFormat()) // "2024-01-31"
+if let solar = calendar.solarIsoFormat() {
+    print("양력: \(solar)") // "2024-01-31"
+}
 
 // 음력 윤달 처리
 calendar.setLunarDate(2023, 3, 15, true) // 윤3월
-print(calendar.lunarIsoFormat()) // "2023-03-15 Intercalation"
-print(calendar.solarIsoFormat()) // 해당 양력 날짜
+if let lunar = calendar.lunarIsoFormat() {
+    print("음력: \(lunar)") // "2023-03-15 Intercalation"
+}
+if let solar = calendar.solarIsoFormat() {
+    print("양력: \(solar)") // 해당 양력 날짜
+}
+```
+
+### 개발 시 디버그 로깅
+
+개발 중에만 내부 로그를 보려면 환경변수를 설정하세요:
+
+```bash
+# 디버그 로그 활성화
+KLC_DEV=1 swift run
+KLC_DEV=1 swift test
+
+# 일반 실행 (로그 없음)
+swift run
 ```
 
 ### 원본 프로젝트와 동일한 API
