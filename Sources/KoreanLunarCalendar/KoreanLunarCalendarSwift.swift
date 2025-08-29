@@ -137,6 +137,15 @@ final class DataLoader {
     static let shared = DataLoader()
     private(set) var isLoaded = false
     private(set) var lunarTable: LunarTable?
+    
+    // MARK: - Constants (from original Java)
+    private static let koreanLunarBaseYear = 1000
+    private static let solarLunarDayDiff = 43
+    private static let lunarSmallMonthDay = 29
+    private static let lunarBigMonthDay = 30
+    private static let solarSmallYearDay = 365
+    private static let solarBigYearDay = 366
+    private static let solarDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 29] // 29 is for leap Feb
 
     private init() {}
 
@@ -217,11 +226,134 @@ final class DataLoader {
         let isIntercalationBig = (yearData >> 16) & 0x1 == 1
         return isIntercalationBig ? constants.lunarBigMonthDays : constants.lunarSmallMonthDays
     }
+    
+    // MARK: - Helper Methods (ported from Java)
+    
+    /// Get lunar days for specific month (including intercalation handling)
+    func getLunarDays(year: Int, month: Int, isIntercalation: Bool) throws -> Int {
+        let yearData = try getData(for: year)
+        let intercalationMonth = try getIntercalationMonth(for: year)
+        
+        if isIntercalation && intercalationMonth == month {
+            // 윤달의 일수
+            let isIntercalationBig = (yearData >> 16) & 0x1 == 1
+            return isIntercalationBig ? Self.lunarBigMonthDay : Self.lunarSmallMonthDay
+        } else {
+            // 일반 월의 일수
+            let bitPosition = 12 - month
+            let isBigMonth = (yearData >> bitPosition) & 0x1 == 1
+            return isBigMonth ? Self.lunarBigMonthDay : Self.lunarSmallMonthDay
+        }
+    }
+    
+    /// Check if given year is solar intercalation (leap) year
+    func isSolarIntercalationYear(_ year: Int) throws -> Bool {
+        let yearData = try getData(for: year)
+        return (yearData >> 30) & 0x1 == 1
+    }
+    
+    /// Get solar days in a year
+    func getSolarDays(year: Int) throws -> Int {
+        return try isSolarIntercalationYear(year) ? Self.solarBigYearDay : Self.solarSmallYearDay
+    }
+    
+    /// Get solar days in a specific month
+    func getSolarDays(year: Int, month: Int) throws -> Int {
+        guard month >= 1 && month <= 12 else {
+            throw DataLoaderError.invalidYearRange
+        }
+        
+        let isLeapYear = try isSolarIntercalationYear(year)
+        if month == 2 && isLeapYear {
+            return Self.solarDays[12] // leap February (29 days)
+        } else {
+            return Self.solarDays[month - 1]
+        }
+    }
+    
+    /// Get lunar days before base year (cumulative)
+    func getLunarDaysBeforeBaseYear(_ year: Int) throws -> Int {
+        var days = 0
+        guard year >= Self.koreanLunarBaseYear else { return 0 }
+        
+        for baseYear in Self.koreanLunarBaseYear...year {
+            days += try getTotalLunarDays(for: baseYear)
+        }
+        return days
+    }
+    
+    /// Get lunar days before base month (cumulative)
+    func getLunarDaysBeforeBaseMonth(year: Int, month: Int, includeIntercalation: Bool) throws -> Int {
+        var days = 0
+        guard year >= Self.koreanLunarBaseYear && month >= 1 else {
+            return 0
+        }
+        
+        // Include target month (matching Java: baseMonth < month + 1)
+        for baseMonth in 1...month {
+            days += try getLunarDays(year: year, month: baseMonth, isIntercalation: false)
+        }
+        
+        if includeIntercalation {
+            let intercalationMonth = try getIntercalationMonth(for: year)
+            if intercalationMonth > 0 && intercalationMonth <= month {
+                days += try getLunarDays(year: year, month: intercalationMonth, isIntercalation: true)
+            }
+        }
+        
+        return days
+    }
+    
+    /// Get solar days before base year (cumulative)
+    func getSolarDaysBeforeBaseYear(_ year: Int) throws -> Int {
+        var days = 0
+        guard year >= Self.koreanLunarBaseYear else { return 0 }
+        
+        for baseYear in Self.koreanLunarBaseYear...year {
+            days += try getSolarDays(year: baseYear)
+        }
+        return days
+    }
+    
+    /// Get solar days before base month (cumulative)
+    func getSolarDaysBeforeBaseMonth(year: Int, month: Int) throws -> Int {
+        var days = 0
+        guard month >= 1 else { return 0 }
+        
+        // Include target month (matching Java: baseMonth < month + 1)
+        for baseMonth in 1...month {
+            days += try getSolarDays(year: year, month: baseMonth)
+        }
+        return days
+    }
+    
+    /// Get solar absolute days from base year
+    func getSolarAbsDays(year: Int, month: Int, day: Int) throws -> Int {
+        var days = try getSolarDaysBeforeBaseYear(year - 1)
+        days += try getSolarDaysBeforeBaseMonth(year: year, month: month - 1) 
+        days += day
+        days -= Self.solarLunarDayDiff
+        return days
+    }
+    
+    /// Get lunar absolute days from base year
+    func getLunarAbsDays(year: Int, month: Int, day: Int, isIntercalation: Bool) throws -> Int {
+        var days = try getLunarDaysBeforeBaseYear(year - 1)
+        days += try getLunarDaysBeforeBaseMonth(year: year, month: month - 1, includeIntercalation: true)
+        days += day
+        
+        let intercalationMonth = try getIntercalationMonth(for: year)
+        if isIntercalation && intercalationMonth == month {
+            days += try getLunarDays(year: year, month: month, isIntercalation: false)
+        }
+        
+        return days
+    }
 }
 
 public final class KoreanLunarCalendar {
-    private var currentSolar: SolarDate?
-    private var currentLunar: LunarDate?
+    internal var currentSolar: SolarDate?
+    internal var currentLunar: LunarDate?
 
     public init() {}
 
@@ -230,34 +362,61 @@ public final class KoreanLunarCalendar {
     public func setSolarDate(_ year: Int, _ month: Int, _ day: Int) -> Bool {
         do {
             try DataLoader.shared.loadIfNeeded()
-
-            // 새로운 메서드들로 정보 추출
-            let intercalationMonth = try DataLoader.shared.getIntercalationMonth(for: year)
-            let totalDays = try DataLoader.shared.getTotalLunarDays(for: year)
-            let isLeapYear = try DataLoader.shared.isSolarLeapYear(year)
-
-            debugLog(
-                "Year \(year): intercalation=\(intercalationMonth), totalDays=\(totalDays), isLeapYear=\(isLeapYear)"
-            )
-
-            // 월별 일수 정보 출력 (테스트용)
-            for month in 1...12 {
-                let days = try DataLoader.shared.getLunarMonthDays(year: year, month: month)
-                debugLog("  Month \(month): \(days) days")
-            }
-
-            if intercalationMonth > 0 {
-                let intercalationDays = try DataLoader.shared.getIntercalationMonthDays(year: year)
-                debugLog("  Intercalation month \(intercalationMonth): \(intercalationDays) days")
-            }
-
+            
+            // Input validation
+            guard year >= 1000 && year <= 2050 else { return false }
+            guard month >= 1 && month <= 12 else { return false }
+            guard day >= 1 && day <= 31 else { return false }
+            
+            debugLog("Converting solar date: \(year)-\(month)-\(day)")
+            
+            // Convert using ported Java algorithm
+            let result = try setLunarDateBySolarDate(solarYear: year, solarMonth: month, solarDay: day)
+            
             self.currentSolar = SolarDate(year: year, month: month, day: day)
-            // TODO: 실제 변환 알고리즘 구현
-            self.currentLunar = nil
+            self.currentLunar = result
             return true
         } catch {
+            debugLog("Error converting solar date: \(error)")
             return false
         }
+    }
+    
+    /// Core conversion: Solar -> Lunar (ported from Java)
+    private func setLunarDateBySolarDate(solarYear: Int, solarMonth: Int, solarDay: Int) throws -> LunarDate {
+        let absDays = try DataLoader.shared.getSolarAbsDays(year: solarYear, month: solarMonth, day: solarDay)
+        
+        var lunarYear = 0
+        var lunarMonth = 0
+        var lunarDay = 0
+        var isIntercalation = false
+        
+        // Determine lunar year
+        let firstDayOfYear = try DataLoader.shared.getLunarAbsDays(year: solarYear, month: 1, day: 1, isIntercalation: false)
+        lunarYear = absDays >= firstDayOfYear ? solarYear : solarYear - 1
+        
+        // Find lunar month by iterating backwards
+        for month in stride(from: 12, through: 1, by: -1) {
+            let absDaysByMonth = try DataLoader.shared.getLunarAbsDays(year: lunarYear, month: month, day: 1, isIntercalation: false)
+            if absDays >= absDaysByMonth {
+                lunarMonth = month
+                
+                // Check for intercalation month
+                let intercalationMonth = try DataLoader.shared.getIntercalationMonth(for: lunarYear)
+                if intercalationMonth == month {
+                    let intercalationStartDays = try DataLoader.shared.getLunarAbsDays(year: lunarYear, month: month, day: 1, isIntercalation: true)
+                    isIntercalation = absDays >= intercalationStartDays
+                }
+                
+                let lunarAbsDays = try DataLoader.shared.getLunarAbsDays(year: lunarYear, month: lunarMonth, day: 1, isIntercalation: isIntercalation)
+                lunarDay = absDays - lunarAbsDays + 1
+                break
+            }
+        }
+        
+        debugLog("Converted to lunar: \(lunarYear)-\(lunarMonth)-\(lunarDay) (intercalation: \(isIntercalation))")
+        
+        return LunarDate(year: lunarYear, month: lunarMonth, day: lunarDay, isLeapMonth: isIntercalation)
     }
 
     /// 음력 → 양력 (성공 시 내부 상태에 저장)
@@ -265,6 +424,11 @@ public final class KoreanLunarCalendar {
     public func setLunarDate(_ year: Int, _ month: Int, _ day: Int, _ intercalation: Bool) -> Bool {
         do {
             try DataLoader.shared.loadIfNeeded()
+            
+            // Input validation
+            guard year >= 1000 && year <= 2050 else { return false }
+            guard month >= 1 && month <= 12 else { return false }
+            guard day >= 1 && day <= 31 else { return false }
 
             // 윤달 유효성 검증
             let intercalationMonth = try DataLoader.shared.getIntercalationMonth(for: year)
@@ -280,28 +444,53 @@ public final class KoreanLunarCalendar {
             }
 
             // 해당 월의 일수 검증
-            let monthDays: Int
-            if intercalation {
-                monthDays = try DataLoader.shared.getIntercalationMonthDays(year: year)
-            } else {
-                monthDays = try DataLoader.shared.getLunarMonthDays(year: year, month: month)
-            }
-
-            if day < 1 || day > monthDays {
+            let monthDays = try DataLoader.shared.getLunarDays(year: year, month: month, isIntercalation: intercalation)
+            if day > monthDays {
                 debugLog(
                     "Invalid day: Month \(month)\(intercalation ? " (intercalation)" : "") in year \(year) has \(monthDays) days, not \(day)"
                 )
                 return false
             }
+            
+            debugLog("Converting lunar date: \(year)-\(month)-\(day) (intercalation: \(intercalation))")
+            
+            // Convert using ported Java algorithm
+            let result = try setSolarDateByLunarDate(lunarYear: year, lunarMonth: month, lunarDay: day, isIntercalation: intercalation)
 
-            self.currentLunar = LunarDate(
-                year: year, month: month, day: day, isLeapMonth: intercalation)
-            // TODO: 실제 변환 알고리즘 구현
-            self.currentSolar = nil
+            self.currentLunar = LunarDate(year: year, month: month, day: day, isLeapMonth: intercalation)
+            self.currentSolar = result
             return true
         } catch {
+            debugLog("Error converting lunar date: \(error)")
             return false
         }
+    }
+    
+    /// Core conversion: Lunar -> Solar (ported from Java)
+    private func setSolarDateByLunarDate(lunarYear: Int, lunarMonth: Int, lunarDay: Int, isIntercalation: Bool) throws -> SolarDate {
+        let absDays = try DataLoader.shared.getLunarAbsDays(year: lunarYear, month: lunarMonth, day: lunarDay, isIntercalation: isIntercalation)
+        
+        var solarYear = 0
+        var solarMonth = 0
+        var solarDay = 0
+        
+        // Determine solar year
+        let nextYearFirstDay = try DataLoader.shared.getSolarAbsDays(year: lunarYear + 1, month: 1, day: 1)
+        solarYear = absDays < nextYearFirstDay ? lunarYear : lunarYear + 1
+        
+        // Find solar month by iterating backwards
+        for month in stride(from: 12, through: 1, by: -1) {
+            let absDaysByMonth = try DataLoader.shared.getSolarAbsDays(year: solarYear, month: month, day: 1)
+            if absDays >= absDaysByMonth {
+                solarMonth = month
+                solarDay = absDays - absDaysByMonth + 1
+                break
+            }
+        }
+        
+        debugLog("Converted to solar: \(solarYear)-\(solarMonth)-\(solarDay)")
+        
+        return SolarDate(year: solarYear, month: solarMonth, day: solarDay)
     }
 
     public func lunarIsoFormat() -> String? {
