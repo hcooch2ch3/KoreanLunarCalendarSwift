@@ -167,7 +167,9 @@ final class KoreanLunarCalendarTests: XCTestCase {
         XCTAssertFalse(cal.setSolarDate(2020, 1, 32), "Should reject day > 31")
         
         // Test invalid lunar dates
+        // 2019 did not have a leap (윤달) 12th month; attempting to set 2019-12-6 as a leap month should be rejected.
         XCTAssertFalse(cal.setLunarDate(2019, 12, 6, true), "Should reject invalid intercalation")
+        // 2020's leap month was the 4th month (윤4월), not the 5th; attempting to set 2020-5-15 as a leap month should be rejected.
         XCTAssertFalse(cal.setLunarDate(2020, 5, 15, true), "Should reject wrong intercalation month")
     }
 }
