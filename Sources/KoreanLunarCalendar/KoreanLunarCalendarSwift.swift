@@ -289,16 +289,14 @@ final class DataLoader {
             return 0
         }
         
-        // Only iterate if month > 0
-        if month > 0 {
-            for baseMonth in 1..<month {  // Changed to exclude target month
-                days += try getLunarDays(year: year, month: baseMonth, isIntercalation: false)
-            }
+        // Include target month (matching Java: baseMonth < month + 1)
+        for baseMonth in 1...month {
+            days += try getLunarDays(year: year, month: baseMonth, isIntercalation: false)
         }
         
         if includeIntercalation {
             let intercalationMonth = try getIntercalationMonth(for: year)
-            if intercalationMonth > 0 && intercalationMonth < month {  // Changed to < month
+            if intercalationMonth > 0 && intercalationMonth <= month {
                 days += try getLunarDays(year: year, month: intercalationMonth, isIntercalation: true)
             }
         }
@@ -322,10 +320,9 @@ final class DataLoader {
         var days = 0
         guard month >= 1 else { return 0 }
         
-        if month > 1 {
-            for baseMonth in 1..<month {  // Changed to exclude target month
-                days += try getSolarDays(year: year, month: baseMonth)
-            }
+        // Include target month (matching Java: baseMonth < month + 1)
+        for baseMonth in 1...month {
+            days += try getSolarDays(year: year, month: baseMonth)
         }
         return days
     }
