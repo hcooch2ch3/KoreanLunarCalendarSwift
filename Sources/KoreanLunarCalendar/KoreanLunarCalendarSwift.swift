@@ -37,6 +37,7 @@ enum DataLoaderError: Error {
     case resourceNotFound
     case decodeFailed
     case invalidYearRange
+    case invalidMonthRange
 }
 
 internal struct LunarTableMetadata: Codable {
@@ -145,7 +146,7 @@ final class DataLoader {
     private static let lunarBigMonthDay = 30
     private static let solarSmallYearDay = 365
     private static let solarBigYearDay = 366
-    private static let solarDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 29] // 29 is for leap Feb
+    private static let solarDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // Standard month days
 
     private init() {}
 
@@ -197,7 +198,7 @@ final class DataLoader {
 
     func getLunarMonthDays(year: Int, month: Int) throws -> Int {
         guard month >= 1 && month <= 12 else {
-            throw DataLoaderError.invalidYearRange
+            throw DataLoaderError.invalidMonthRange
         }
 
         let yearData = try getData(for: year)
@@ -260,12 +261,12 @@ final class DataLoader {
     /// Get solar days in a specific month
     func getSolarDays(year: Int, month: Int) throws -> Int {
         guard month >= 1 && month <= 12 else {
-            throw DataLoaderError.invalidYearRange
+            throw DataLoaderError.invalidMonthRange
         }
         
         let isLeapYear = try isSolarIntercalationYear(year)
         if month == 2 && isLeapYear {
-            return Self.solarDays[12] // leap February (29 days)
+            return 29 // leap February (29 days)
         } else {
             return Self.solarDays[month - 1]
         }
