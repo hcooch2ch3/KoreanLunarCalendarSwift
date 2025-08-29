@@ -506,7 +506,96 @@ public final class KoreanLunarCalendar {
         return String(format: "%04d-%02d-%02d", s.year, s.month, s.day)
     }
 
-    // TODO: 간지 문자열 (추후 구현)
-    public func getGapJaString() -> String? { return nil }
-    public func getChineseGapJaString() -> String? { return nil }
+    // MARK: - Gap-Ja (간지) Calculation
+    
+    /// Korean Celestial Stems (천간)
+    private static let koreanCheongan = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
+    
+    /// Korean Earthly Branches (지지)  
+    private static let koreanGanji = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
+    
+    /// Chinese Celestial Stems (천간)
+    private static let chineseCheongan = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+    
+    /// Chinese Earthly Branches (지지)
+    private static let chineseGanji = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+    
+    /// Korean Gap-Ja units
+    private static let koreanGapjaUnit = ["년", "월", "일"]
+    
+    /// Chinese Gap-Ja units  
+    private static let chineseGapjaUnit = ["年", "月", "日"]
+    
+    private func calculateGapJa() -> (year: (Int, Int), month: (Int, Int), day: (Int, Int))? {
+        guard let lunar = currentLunar else { return nil }
+        
+        do {
+            let absDays = try DataLoader.shared.getLunarAbsDays(
+                year: lunar.year, 
+                month: lunar.month, 
+                day: lunar.day, 
+                isIntercalation: lunar.isLeapMonth
+            )
+            
+            guard absDays > 0 else { return nil }
+            
+            // Year Gap-Ja (연간지)
+            let yearCheonganIndex = ((lunar.year + 6) - 1000) % 10
+            let yearGanjiIndex = ((lunar.year + 0) - 1000) % 12
+            
+            // Month Gap-Ja (월간지)
+            var monthCount = lunar.month
+            monthCount += 12 * (lunar.year - 1000)
+            let monthCheonganIndex = (monthCount + 3) % 10
+            let monthGanjiIndex = (monthCount + 1) % 12
+            
+            // Day Gap-Ja (일간지)  
+            let dayCheonganIndex = (absDays + 4) % 10
+            let dayGanjiIndex = (absDays + 2) % 12
+            
+            return (
+                year: (yearCheonganIndex, yearGanjiIndex),
+                month: (monthCheonganIndex, monthGanjiIndex),
+                day: (dayCheonganIndex, dayGanjiIndex)
+            )
+        } catch {
+            return nil
+        }
+    }
+    
+    /// 한글 간지 문자열 반환 ("갑자년 을축월 병인일")
+    public func getGapJaString() -> String? {
+        guard let gapja = calculateGapJa() else { return nil }
+        
+        let yearGapja = Self.koreanCheongan[gapja.year.0] + Self.koreanGanji[gapja.year.1]
+        let monthGapja = Self.koreanCheongan[gapja.month.0] + Self.koreanGanji[gapja.month.1]  
+        let dayGapja = Self.koreanCheongan[gapja.day.0] + Self.koreanGanji[gapja.day.1]
+        
+        var result = "\(yearGapja)\(Self.koreanGapjaUnit[0]) \(monthGapja)\(Self.koreanGapjaUnit[1]) \(dayGapja)\(Self.koreanGapjaUnit[2])"
+        
+        // Add intercalation marker
+        if let lunar = currentLunar, lunar.isLeapMonth {
+            result += "(윤)"
+        }
+        
+        return result
+    }
+    
+    /// 한자 간지 문자열 반환 ("甲子年 乙丑月 丙寅日")  
+    public func getChineseGapJaString() -> String? {
+        guard let gapja = calculateGapJa() else { return nil }
+        
+        let yearGapja = Self.chineseCheongan[gapja.year.0] + Self.chineseGanji[gapja.year.1]
+        let monthGapja = Self.chineseCheongan[gapja.month.0] + Self.chineseGanji[gapja.month.1]
+        let dayGapja = Self.chineseCheongan[gapja.day.0] + Self.chineseGanji[gapja.day.1]
+        
+        var result = "\(yearGapja)\(Self.chineseGapjaUnit[0]) \(monthGapja)\(Self.chineseGapjaUnit[1]) \(dayGapja)\(Self.chineseGapjaUnit[2])"
+        
+        // Add intercalation marker
+        if let lunar = currentLunar, lunar.isLeapMonth {
+            result += "(閏)"
+        }
+        
+        return result
+    }
 }
