@@ -51,8 +51,11 @@ dependencies: [
 ```swift
 import KoreanLunarCalendar
 
-// 달력 인스턴스 생성
+// 기본 달력 인스턴스 생성
 let calendar = KoreanLunarCalendar()
+
+// 성능 최적화가 필요한 경우 (10배 빠름)
+let fastCalendar = KoreanLunarCalendar(enableOptimization: true)
 ```
 
 ### 1. 양력 → 음력 변환
@@ -135,6 +138,7 @@ let invalidLeap = calendar.setLunarDate(2019, 4, 15, true)  // false (2019년 �
 - **간지 계산**: 간지는 현재 설정된 **음력 날짜**를 기준으로 계산됩니다.
 - **윤달 처리**: 음력 날짜 설정 시 네 번째 매개변수로 윤달 여부를 지정해야 합니다.
 - **날짜 범위**: 1000년~2050년 범위 밖의 날짜는 설정할 수 없습니다.
+- **성능 최적화**: `enableOptimization: true`로 초기화하면 Lazy Lookup Table을 사용해 약 10배 빠른 성능을 제공합니다. (달력 UI 구현 등 여러번 호출해야할 경우 유리)
 
 ## 실제 사용 예시
 
@@ -172,6 +176,16 @@ if let thisYearBirthday = calendar.solarIsoFormat() {
 ## API 참조
 
 ### KoreanLunarCalendar 클래스
+
+#### 초기화
+
+```swift
+// 기본 초기화 (메모리 효율적)
+init()
+
+// 성능 최적화 초기화 (약 10배 빠름)
+init(enableOptimization: Bool)
+```
 
 #### 날짜 설정 메서드
 
@@ -293,6 +307,47 @@ let monthDays = ((yearData >> (12 - month)) & 0x1) == 1 ? 30 : 29
 - 윤달월: `0000` → 윤달 없음
 - 총일수: `101001000` → 354일
 - 태양력 윤년: `1` → 윤년
+
+## 성능 최적화
+
+### 기본 사용 vs 최적화 사용
+
+```swift
+// 기본 사용 (메모리 사용량 최소)
+let calendar = KoreanLunarCalendar()
+
+// 성능 최적화 사용 (10배 빠름, 약간의 메모리 사용)
+let fastCalendar = KoreanLunarCalendar(enableOptimization: true)
+```
+
+### 언제 최적화를 사용할까요?
+
+**최적화 권장 상황:**
+
+- 많은 날짜 변환을 연속으로 수행하는 경우
+- 사용자 인터페이스에서 실시간 변환이 필요한 경우
+- 대량의 날짜 데이터를 처리하는 경우
+
+**최적화 불필요 상황:**
+
+- 가끔씩 한두 번의 변환만 하는 경우
+- 메모리 사용량을 최소화해야 하는 경우
+
+### 최적화 사용시 성능 개선 효과
+
+벤치마크 테스트 결과 (800회 변환 기준):
+
+- 일반 모드: ~4.4초
+- 최적화 모드: ~0.4초
+- **성능 향상: 약 10배**
+
+### 최적화 사용시 메모리 사용량
+
+최적화 모드에서 사용되는 추가 메모리:
+
+- 연도별 누적 일수 캐시: ~4KB (1000년-2050년)
+- 월별 일수 캐시: ~2KB (자주 사용되는 월 데이터)
+- **총 추가 로드되는 메모리: 약 6KB**
 
 ## 개발 시 디버그 로깅
 
