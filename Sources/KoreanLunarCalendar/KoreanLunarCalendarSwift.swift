@@ -149,10 +149,9 @@ final class DataLoader {
     private static let solarDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // Standard month days
 
     // MARK: - Performance Optimization: Lazy Lookup Tables
-    private var yearTotalDaysCache: [Int: Int] = [:]
-    private var monthDaysCache: [String: Int] = [:]
-    private var yearCumulativeDaysCache: [Int: Int] = [:]
-    private let cacheQueue = DispatchQueue(label: "com.koreanlunar.cache", attributes: .concurrent)
+    private let yearTotalDaysCache = NSCache<NSNumber, NSNumber>()
+    private let monthDaysCache = NSCache<NSString, NSNumber>()
+    private let yearCumulativeDaysCache = NSCache<NSNumber, NSNumber>()
 
     private init() {}
 
@@ -283,19 +282,18 @@ final class DataLoader {
         guard year >= Self.koreanLunarBaseYear else { return 0 }
         
         if useOptimization {
-            return try cacheQueue.sync {
-                if let cached = yearCumulativeDaysCache[year] {
-                    return cached
-                }
-                
-                var days = 0
-                for baseYear in Self.koreanLunarBaseYear...year {
-                    days += try getTotalLunarDaysOptimized(for: baseYear)
-                }
-                
-                yearCumulativeDaysCache[year] = days
-                return days
+            let yearKey = NSNumber(value: year)
+            if let cached = yearCumulativeDaysCache.object(forKey: yearKey) {
+                return cached.intValue
             }
+            
+            var days = 0
+            for baseYear in Self.koreanLunarBaseYear...year {
+                days += try getTotalLunarDaysOptimized(for: baseYear)
+            }
+            
+            yearCumulativeDaysCache.setObject(NSNumber(value: days), forKey: yearKey)
+            return days
         } else {
             var days = 0
             for baseYear in Self.koreanLunarBaseYear...year {
@@ -307,12 +305,13 @@ final class DataLoader {
     
     /// Optimized version of getTotalLunarDays with caching
     private func getTotalLunarDaysOptimized(for year: Int) throws -> Int {
-        if let cached = yearTotalDaysCache[year] {
-            return cached
+        let yearKey = NSNumber(value: year)
+        if let cached = yearTotalDaysCache.object(forKey: yearKey) {
+            return cached.intValue
         }
         
         let days = try getTotalLunarDays(for: year)
-        yearTotalDaysCache[year] = days
+        yearTotalDaysCache.setObject(NSNumber(value: days), forKey: yearKey)
         return days
     }
     
@@ -323,27 +322,25 @@ final class DataLoader {
         }
         
         if useOptimization {
-            let cacheKey = "\(year)-\(month)-\(includeIntercalation)"
-            return try cacheQueue.sync {
-                if let cached = monthDaysCache[cacheKey] {
-                    return cached
-                }
-                
-                var days = 0
-                for baseMonth in 1...month {
-                    days += try getLunarDays(year: year, month: baseMonth, isIntercalation: false)
-                }
-                
-                if includeIntercalation {
-                    let intercalationMonth = try getIntercalationMonth(for: year)
-                    if intercalationMonth > 0 && intercalationMonth <= month {
-                        days += try getLunarDays(year: year, month: intercalationMonth, isIntercalation: true)
-                    }
-                }
-                
-                monthDaysCache[cacheKey] = days
-                return days
+            let cacheKey = NSString(string: "\(year)-\(month)-\(includeIntercalation)")
+            if let cached = monthDaysCache.object(forKey: cacheKey) {
+                return cached.intValue
             }
+            
+            var days = 0
+            for baseMonth in 1...month {
+                days += try getLunarDays(year: year, month: baseMonth, isIntercalation: false)
+            }
+            
+            if includeIntercalation {
+                let intercalationMonth = try getIntercalationMonth(for: year)
+                if intercalationMonth > 0 && intercalationMonth <= month {
+                    days += try getLunarDays(year: year, month: intercalationMonth, isIntercalation: true)
+                }
+            }
+            
+            monthDaysCache.setObject(NSNumber(value: days), forKey: cacheKey)
+            return days
         } else {
             var days = 0
             for baseMonth in 1...month {
