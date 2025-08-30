@@ -1,16 +1,17 @@
 # KoreanLunarCalendarSwift
 
-[KoreanLunarCalendar](https://github.com/usingsky/KoreanLunarCalendar)를 Swift로 포팅한 프로젝트로, Apple 디바이스에서 한국 음력 달력을 사용할 수 있게 해주는 라이브러리입니다.
+한국 음력 달력을 위한 Swift 라이브러리입니다. Apple 디바이스에서 양력과 음력 간 정확한 변환과 간지(干支) 계산을 제공합니다.
 
 ## 개요
 
-KoreanLunarCalendarSwift는 한국천문연구원(KARI) 표준을 따라 양력과 음력 간의 정확한 변환 기능을 제공하는 Swift Package Manager 라이브러리입니다. ~~원본 Java 버전의 모든 기능을 Apple 플랫폼에서 사용할 수 있도록 포팅했습니다.~~ (아직 작업 중...)
+KoreanLunarCalendarSwift는 한국천문연구원(KARI) 표준을 따라 양력과 음력 간의 정확한 변환 기능을 제공하는 Swift Package Manager 라이브러리입니다. 원본 [KoreanLunarCalendar Java 라이브러리](https://github.com/usingsky/KoreanLunarCalendar)를 Swift로 포팅했습니다.
 
 ### 주요 특징
 
 - **한국천문연구원(KARI) 표준 기반**
-- **1000년부터 2050년까지 지원**
+- **1000년부터 2050년까지 지원**  
 - **음력 윤달(intercalation) 완벽 지원**
+- **간지(干支) 계산 기능 제공**
 - **iOS, macOS, tvOS, watchOS 네이티브 지원**
 
 ## 지원 플랫폼
@@ -45,69 +46,176 @@ dependencies: [
 
 ## 사용법
 
-### 기본 사용
+### 라이브러리 import
 
 ```swift
 import KoreanLunarCalendar
 
+// 달력 인스턴스 생성
 let calendar = KoreanLunarCalendar()
-
-// 양력 -> 음력 변환
-calendar.setSolarDate(2024, 1, 1)
-if let lunar = calendar.lunarIsoFormat() {
-    print("음력: \(lunar)")
-}
-if let gapja = calendar.getGapJaString() {
-    print("간지: \(gapja)")
-}
-
-// 음력 -> 양력 변환 (윤달 여부 포함)
-calendar.setLunarDate(2023, 12, 20, false) // 평달
-if let solar = calendar.solarIsoFormat() {
-    print("양력: \(solar)") // "2024-01-31"
-}
-
-// 음력 윤달 처리
-calendar.setLunarDate(2023, 3, 15, true) // 윤3월
-if let lunar = calendar.lunarIsoFormat() {
-    print("음력: \(lunar)") // "2023-03-15 Intercalation"
-}
-if let solar = calendar.solarIsoFormat() {
-    print("양력: \(solar)") // 해당 양력 날짜
-}
 ```
 
-### 개발 시 디버그 로깅
-
-개발 중에만 내부 로그를 보려면 환경변수를 설정하세요:
-
-```bash
-# 디버그 로그 활성화
-KLC_DEV=1 swift run
-KLC_DEV=1 swift test
-
-# 일반 실행 (로그 없음)
-swift run
-```
-
-### 원본 프로젝트와 동일한 API
-
-이 Swift 포팅 버전은 원본 [KoreanLunarCalendar](https://github.com/usingsky/KoreanLunarCalendar)와 동일한 메서드명과 기능을 제공합니다:
+### 1. 양력 → 음력 변환
 
 ```swift
-calendar.setSolarDate(2017, 6, 24)
-calendar.getLunarIsoFormat()
-calendar.getGapjaString()
+// 양력 날짜 설정
+let success = calendar.setSolarDate(2024, 2, 10) // 2024년 2월 10일
+if success {
+    // 변환된 음력 날짜 확인
+    if let lunar = calendar.lunarIsoFormat() {
+        print("음력: \(lunar)")  // 출력: "2024-01-01"
+    }
+    
+    // 간지 정보 확인
+    if let gapja = calendar.getGapJaString() {
+        print("간지: \(gapja)")  // 출력: "갑진년 을축월 갑자일"
+    }
+}
+```
 
-calendar.setLunarDate(1956, 1, 21, false)
-calendar.getSolarIsoFormat()
+### 2. 음력 → 양력 변환
+
+```swift
+// 평달 (일반 월)
+let success = calendar.setLunarDate(2024, 1, 15, false)
+if success {
+    if let solar = calendar.solarIsoFormat() {
+        print("양력: \(solar)")  // 출력: "2024-02-24"
+    }
+}
+
+// 윤달 (intercalation month)
+calendar.setLunarDate(2020, 4, 15, true) // 2020년 윤4월 15일
+if let solar = calendar.solarIsoFormat() {
+    print("양력: \(solar)")  // 출력: "2020-06-06"
+}
+if let lunar = calendar.lunarIsoFormat() {
+    print("음력: \(lunar)")  // 출력: "2020-04-15 Intercalation"
+}
+```
+
+### 3. 간지(干支) 계산
+
+```swift
+// 양력 날짜로 간지 계산
+calendar.setSolarDate(2024, 1, 1)
+
+// 한글 간지
+if let korean = calendar.getGapJaString() {
+    print("한글 간지: \(korean)")  // "계묘년 갑자월 갑자일"
+}
+
+// 한자 간지
+if let chinese = calendar.getChineseGapJaString() {
+    print("한자 간지: \(chinese)")  // "癸卯年 甲子月 甲子日"
+}
+
+// 윤달의 경우 (윤) 또는 (閏) 표시
+calendar.setLunarDate(2020, 4, 15, true) // 윤4월
+if let gapja = calendar.getGapJaString() {
+    print("윤달 간지: \(gapja)")  // "경자년 신사월 경진일(윤)"
+}
+```
+
+### 4. 날짜 유효성 검사
+
+```swift
+// 유효한 날짜인지 확인
+let isValid = calendar.setSolarDate(2024, 2, 29)  // true (윤년)
+let isInvalid = calendar.setSolarDate(2023, 2, 29)  // false (평년)
+
+// 윤달 유효성 검사
+let validLeap = calendar.setLunarDate(2020, 4, 15, true)  // true (2020년 윤4월 존재)
+let invalidLeap = calendar.setLunarDate(2019, 4, 15, true)  // false (2019년 윤4월 없음)
+```
+
+## 중요사항
+
+- **날짜 변환**: 양력 날짜를 설정하면 자동으로 음력으로 변환되고, 음력 날짜를 설정하면 자동으로 양력으로 변환됩니다.
+- **간지 계산**: 간지는 현재 설정된 **음력 날짜**를 기준으로 계산됩니다.
+- **윤달 처리**: 음력 날짜 설정 시 네 번째 매개변수로 윤달 여부를 지정해야 합니다.
+- **날짜 범위**: 1000년~2050년 범위 밖의 날짜는 설정할 수 없습니다.
+
+## 실제 사용 예시
+
+### 한국 설날 간지 계산
+
+```swift
+let calendar = KoreanLunarCalendar()
+
+// 2024년 설날 (양력 2024-02-10)
+calendar.setSolarDate(2024, 2, 10)
+print("양력: \(calendar.solarIsoFormat() ?? "")")     // "2024-02-10"
+print("음력: \(calendar.lunarIsoFormat() ?? "")")     // "2024-01-01" 
+print("간지: \(calendar.getGapJaString() ?? "")")     // "갑진년 을축월 갑자일"
+```
+
+### 생일 변환 예시
+
+```swift
+// 음력 생일을 양력으로 변환
+let calendar = KoreanLunarCalendar()
+
+// 음력 1990년 3월 15일 생 (평달)
+calendar.setLunarDate(1990, 3, 15, false)
+if let solarBirthday = calendar.solarIsoFormat() {
+    print("양력 생일: \(solarBirthday)")
+}
+
+// 올해 음력 생일이 양력 몇 월 며칠인지 확인
+calendar.setLunarDate(2024, 3, 15, false) 
+if let thisYearBirthday = calendar.solarIsoFormat() {
+    print("2024년 음력 생일: \(thisYearBirthday)")
+}
+```
+
+## API 참조
+
+### KoreanLunarCalendar 클래스
+
+#### 날짜 설정 메서드
+
+```swift
+// 양력 날짜 설정 및 음력 변환
+func setSolarDate(_ year: Int, _ month: Int, _ day: Int) -> Bool
+
+// 음력 날짜 설정 및 양력 변환
+func setLunarDate(_ year: Int, _ month: Int, _ day: Int, _ intercalation: Bool) -> Bool
+```
+
+#### 날짜 조회 메서드
+
+```swift
+// 현재 양력 날짜를 "YYYY-MM-DD" 형식으로 반환
+func solarIsoFormat() -> String?
+
+// 현재 음력 날짜를 "YYYY-MM-DD" 또는 "YYYY-MM-DD Intercalation" 형식으로 반환
+func lunarIsoFormat() -> String?
+```
+
+#### 간지 계산 메서드
+
+```swift
+// 한글 간지 반환 ("갑자년 을축월 병인일")
+func getGapJaString() -> String?
+
+// 한자 간지 반환 ("甲子年 乙丑月 丙寅日")
+func getChineseGapJaString() -> String?
+```
+
+#### 날짜 구조체 접근
+
+```swift
+// 현재 설정된 양력 날짜
+var currentSolar: SolarDate? { get }
+
+// 현재 설정된 음력 날짜  
+var currentLunar: LunarDate? { get }
 ```
 
 ### 데이터 구조
 
 #### SolarDate
-
-양력 날짜를 나타내는 구조체입니다.
 
 ```swift
 public struct SolarDate: Equatable, Sendable {
@@ -119,8 +227,6 @@ public struct SolarDate: Equatable, Sendable {
 
 #### LunarDate
 
-음력 날짜를 나타내는 구조체입니다.
-
 ```swift
 public struct LunarDate: Equatable, Sendable {
     public let year: Int
@@ -129,19 +235,6 @@ public struct LunarDate: Equatable, Sendable {
     public let isLeapMonth: Bool // 윤달 여부
 }
 ```
-
-## API 참조
-
-### KoreanLunarCalendar
-
-#### 메서드
-
-- `setSolarDate(_:_:_:) -> Bool`: 양력 날짜를 설정하고 음력으로 변환
-- `setLunarDate(_:_:_:_:) -> Bool`: 음력 날짜를 설정하고 양력으로 변환
-- `solarIsoFormat() -> String?`: 현재 양력 날짜를 ISO 형식 문자열로 반환
-- `lunarIsoFormat() -> String?`: 현재 음력 날짜를 ISO 형식 문자열로 반환
-- `getGapJaString() -> String?`: 간지 문자열 반환 (구현 예정)
-- `getChineseGapJaString() -> String?`: 한자 간지 문자열 반환 (구현 예정)
 
 ## 데이터 구조
 
@@ -199,6 +292,19 @@ let monthDays = ((yearData >> (12 - month)) & 0x1) == 1 ? 30 : 29
 - 총일수: `101001000` → 354일
 - 태양력 윤년: `1` → 윤년
 
+## 개발 시 디버그 로깅
+
+개발 중에만 내부 로그를 보려면 환경변수를 설정하세요:
+
+```bash
+# 디버그 로그 활성화
+KLC_DEV=1 swift run
+KLC_DEV=1 swift test
+
+# 일반 실행 (로그 없음)
+swift run
+```
+
 ## 포팅 상태
 
 원본 KoreanLunarCalendar 프로젝트를 Swift로 포팅하는 진행 상황:
@@ -206,11 +312,11 @@ let monthDays = ((yearData >> (12 - month)) & 0x1) == 1 ? 30 : 29
 - [x] 기본 구조 및 Swift 인터페이스 설계
 - [x] Apple 플랫폼 패키지 구성 (SPM)
 - [x] 음력 데이터 테이블 포팅 (lunar_table.json)
-- [ ] 원본 Java 알고리즘을 Swift로 변환
-- [ ] 음력-양력 변환 로직 구현
-- [ ] 간지(干支) 계산 기능 구현
-- [ ] 날짜 범위 검증 로직
-- [ ] 단위 테스트 완성
+- [x] 원본 Java 알고리즘을 Swift로 변환
+- [x] 음력-양력 변환 로직 구현
+- [x] 간지(干支) 계산 기능 구현
+- [x] 날짜 범위 검증 로직
+- [x] 단위 테스트 완성
 
 ## 원본 프로젝트
 
