@@ -468,4 +468,73 @@ final class KoreanLunarCalendarTests: XCTestCase {
             }
         }
     }
+    
+    func testGapJaDataStructure() {
+        let calendar = KoreanLunarCalendar()
+        
+        // Test lunar Gap-Ja data structure
+        XCTAssertTrue(calendar.setSolarDate(2024, 1, 1))
+        
+        guard let lunarGapja = calendar.getGapJaDate(isSolarGapja: false) else {
+            XCTFail("Lunar Gap-Ja should not be nil")
+            return
+        }
+        
+        // Verify structure
+        XCTAssertEqual(lunarGapja.year.cheongan, "계")
+        XCTAssertEqual(lunarGapja.year.jiji, "묘")
+        XCTAssertEqual(lunarGapja.month.cheongan, "갑")
+        XCTAssertEqual(lunarGapja.month.jiji, "자")
+        XCTAssertEqual(lunarGapja.day.cheongan, "갑")
+        XCTAssertEqual(lunarGapja.day.jiji, "자")
+        XCTAssertFalse(lunarGapja.isIntercalation)
+        XCTAssertFalse(lunarGapja.isSolarBased)
+        
+        // Test solar Gap-Ja data structure
+        guard let solarGapja = calendar.getGapJaDate(isSolarGapja: true) else {
+            XCTFail("Solar Gap-Ja should not be nil")
+            return
+        }
+        
+        XCTAssertEqual(solarGapja.year.cheongan, "갑")
+        XCTAssertEqual(solarGapja.year.jiji, "진")
+        XCTAssertEqual(solarGapja.month.cheongan, "병")
+        XCTAssertEqual(solarGapja.month.jiji, "인")
+        XCTAssertEqual(solarGapja.day.cheongan, "갑")
+        XCTAssertEqual(solarGapja.day.jiji, "자")
+        XCTAssertFalse(solarGapja.isIntercalation)
+        XCTAssertTrue(solarGapja.isSolarBased)
+        
+        // Test Chinese Gap-Ja data structure
+        guard let chineseGapja = calendar.getGapJaDate(isSolarGapja: false, isChinese: true) else {
+            XCTFail("Chinese Gap-Ja should not be nil")
+            return
+        }
+        
+        XCTAssertEqual(chineseGapja.year.cheongan, "癸")
+        XCTAssertEqual(chineseGapja.year.jiji, "卯")
+        XCTAssertEqual(chineseGapja.month.cheongan, "甲")
+        XCTAssertEqual(chineseGapja.month.jiji, "子")
+        XCTAssertEqual(chineseGapja.day.cheongan, "甲")
+        XCTAssertEqual(chineseGapja.day.jiji, "子")
+        XCTAssertFalse(chineseGapja.isIntercalation)
+        XCTAssertFalse(chineseGapja.isSolarBased)
+        
+        print("\n2024-01-01 Gap-Ja Data Structure:")
+        print("- Lunar Korean: \(lunarGapja.year.cheongan)\(lunarGapja.year.jiji)년 \(lunarGapja.month.cheongan)\(lunarGapja.month.jiji)월 \(lunarGapja.day.cheongan)\(lunarGapja.day.jiji)일")
+        print("- Lunar Chinese: \(chineseGapja.year.cheongan)\(chineseGapja.year.jiji)年 \(chineseGapja.month.cheongan)\(chineseGapja.month.jiji)月 \(chineseGapja.day.cheongan)\(chineseGapja.day.jiji)日")
+        print("- Solar: \(solarGapja.year.cheongan)\(solarGapja.year.jiji)년 \(solarGapja.month.cheongan)\(solarGapja.month.jiji)월 \(solarGapja.day.cheongan)\(solarGapja.day.jiji)일")
+        
+        // Test intercalation
+        XCTAssertTrue(calendar.setLunarDate(2020, 4, 15, true))
+        guard let intercalationGapja = calendar.getGapJaDate(isSolarGapja: false) else {
+            XCTFail("Intercalation Gap-Ja should not be nil")
+            return
+        }
+        
+        XCTAssertTrue(intercalationGapja.isIntercalation)
+        XCTAssertFalse(intercalationGapja.isSolarBased)
+        
+        print("- Intercalation: \(intercalationGapja.year.cheongan)\(intercalationGapja.year.jiji)년 \(intercalationGapja.month.cheongan)\(intercalationGapja.month.jiji)월 \(intercalationGapja.day.cheongan)\(intercalationGapja.day.jiji)일 (윤달)")
+    }
 }

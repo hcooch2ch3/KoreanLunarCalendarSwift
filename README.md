@@ -126,9 +126,49 @@ calendar.setLunarDate(2020, 4, 15, true) // 윤4월
 if let gapja = calendar.getGapJaString() {
     print("윤달 간지: \(gapja)")  // "경자년 신사월 경진일(윤)"
 }
+
+// 간지 데이터로 접근 (구조화된 형태)
+if let gapjaData = calendar.getGapJaDate() {
+    print("연: \(gapjaData.year.cheongan)\(gapjaData.year.jiji)")  // "계묘"
+    print("월: \(gapjaData.month.cheongan)\(gapjaData.month.jiji)")  // "갑자"
+    print("일: \(gapjaData.day.cheongan)\(gapjaData.day.jiji)")  // "갑자"
+    print("윤달: \(gapjaData.isIntercalation)")  // true
+    print("양력기준: \(gapjaData.isSolarBased)")  // false
+}
+
+// 한자 간지 데이터로 접근
+if let chineseData = calendar.getGapJaDate(isChinese: true) {
+    print("연: \(chineseData.year.cheongan)\(chineseData.year.jiji)")  // "癸卯"
+    print("월: \(chineseData.month.cheongan)\(chineseData.month.jiji)")  // "甲子"
+    print("일: \(chineseData.day.cheongan)\(chineseData.day.jiji)")  // "甲子"
+}
+
+// 양력 기준 간지 데이터
+if let solarData = calendar.getGapJaDate(isSolarGapja: true) {
+    print("양력 연: \(solarData.year.cheongan)\(solarData.year.jiji)")  // "갑진"
+}
 ```
 
-### 4. 날짜 유효성 검사
+### 4. 날짜 데이터로 접근
+
+```swift
+// 양력 날짜 설정 후 날짜 데이터로 접근
+calendar.setSolarDate(2024, 2, 10)
+
+// 문자열 대신 날짜 데이터로 직접 접근
+if let solar = calendar.currentSolar {
+    print("양력: \(solar.year)년 \(solar.month)월 \(solar.day)일")
+}
+
+if let lunar = calendar.currentLunar {
+    print("음력: \(lunar.year)년 \(lunar.month)월 \(lunar.day)일")
+    if lunar.isLeapMonth {
+        print("윤달입니다")
+    }
+}
+```
+
+### 5. 날짜 유효성 검사
 
 ```swift
 // 유효한 날짜인지 확인
@@ -218,13 +258,18 @@ func lunarIsoFormat() -> String?
 #### 간지 계산 메서드
 
 ```swift
-// 한글 간지 반환 ("갑자년 을축월 병인일")
+// 한글 간지 문자열 반환 ("갑자년 을축월 병인일")
 // isSolarGapja: true면 양력 기준, false면 음력 기준 (기본값: false)
 func getGapJaString(isSolarGapja: Bool = false) -> String?
 
-// 한자 간지 반환 ("甲子年 乙丑月 丙寅日")
+// 한자 간지 문자열 반환 ("甲子年 乙丑月 丙寅日")
 // isSolarGapja: true면 양력 기준, false면 음력 기준 (기본값: false)
 func getChineseGapJaString(isSolarGapja: Bool = false) -> String?
+
+// 간지 데이터 반환 (구조화된 형태)
+// isSolarGapja: true면 양력 기준, false면 음력 기준 (기본값: false)
+// isChinese: true면 한자, false면 한글 (기본값: false)
+func getGapJaDate(isSolarGapja: Bool = false, isChinese: Bool = false) -> GapJaDate?
 ```
 
 #### 날짜 구조체 접근
@@ -242,7 +287,7 @@ var currentLunar: LunarDate? { get }
 #### SolarDate
 
 ```swift
-public struct SolarDate: Equatable, Sendable {
+public struct SolarDate: Equatable {
     public let year: Int
     public let month: Int
     public let day: Int
@@ -252,11 +297,32 @@ public struct SolarDate: Equatable, Sendable {
 #### LunarDate
 
 ```swift
-public struct LunarDate: Equatable, Sendable {
+public struct LunarDate: Equatable {
     public let year: Int
     public let month: Int
     public let day: Int
     public let isLeapMonth: Bool // 윤달 여부
+}
+```
+
+#### GapJaElement
+
+```swift
+public struct GapJaElement: Equatable {
+    public let cheongan: String // 천간 (갑, 을, 병, ...)
+    public let jiji: String     // 지지 (자, 축, 인, ...)
+}
+```
+
+#### GapJaDate
+
+```swift
+public struct GapJaDate: Equatable {
+    public let year: GapJaElement
+    public let month: GapJaElement
+    public let day: GapJaElement
+    public let isIntercalation: Bool // 윤달 여부
+    public let isSolarBased: Bool    // 양력 기준 여부
 }
 ```
 

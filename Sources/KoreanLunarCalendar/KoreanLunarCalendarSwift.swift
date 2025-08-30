@@ -9,7 +9,7 @@ internal func debugLog(_ message: String, function: String = #function, line: In
     #endif
 }
 
-public struct LunarDate: Equatable, Sendable {
+public struct LunarDate: Equatable {
     public let year: Int
     public let month: Int
     public let day: Int
@@ -22,7 +22,7 @@ public struct LunarDate: Equatable, Sendable {
     }
 }
 
-public struct SolarDate: Equatable, Sendable {
+public struct SolarDate: Equatable {
     public let year: Int
     public let month: Int
     public let day: Int
@@ -30,6 +30,36 @@ public struct SolarDate: Equatable, Sendable {
         self.year = year
         self.month = month
         self.day = day
+    }
+}
+
+public struct GapJaElement: Equatable {
+    public let cheongan: String
+    public let jiji: String
+    
+    public init(cheongan: String, jiji: String) {
+        self.cheongan = cheongan
+        self.jiji = jiji
+    }
+}
+
+public struct GapJaDate: Equatable {
+    public let year: GapJaElement
+    public let month: GapJaElement
+    public let day: GapJaElement
+    public let isIntercalation: Bool
+    public let isSolarBased: Bool
+    
+    public init(year: GapJaElement, 
+                month: GapJaElement, 
+                day: GapJaElement, 
+                isIntercalation: Bool, 
+                isSolarBased: Bool) {
+        self.year = year
+        self.month = month
+        self.day = day
+        self.isIntercalation = isIntercalation
+        self.isSolarBased = isSolarBased
     }
 }
 
@@ -406,8 +436,11 @@ final class DataLoader {
 }
 
 public final class KoreanLunarCalendar {
-    internal var currentSolar: SolarDate?
-    internal var currentLunar: LunarDate?
+    public var currentSolar: SolarDate? { return _currentSolar }
+    public var currentLunar: LunarDate? { return _currentLunar }
+    
+    private var _currentSolar: SolarDate?
+    private var _currentLunar: LunarDate?
     
     /// Performance optimization flag - enables lazy lookup tables when true
     private let enableOptimization: Bool
@@ -434,8 +467,8 @@ public final class KoreanLunarCalendar {
             // Convert using ported Java algorithm
             let result = try setLunarDateBySolarDate(solarYear: year, solarMonth: month, solarDay: day)
             
-            self.currentSolar = SolarDate(year: year, month: month, day: day)
-            self.currentLunar = result
+            self._currentSolar = SolarDate(year: year, month: month, day: day)
+            self._currentLunar = result
             return true
         } catch {
             debugLog("Error converting solar date: \(error)")
@@ -518,8 +551,8 @@ public final class KoreanLunarCalendar {
             // Convert using ported Java algorithm
             let result = try setSolarDateByLunarDate(lunarYear: year, lunarMonth: month, lunarDay: day, isIntercalation: intercalation)
 
-            self.currentLunar = LunarDate(year: year, month: month, day: day, isLeapMonth: intercalation)
-            self.currentSolar = result
+            self._currentLunar = LunarDate(year: year, month: month, day: day, isLeapMonth: intercalation)
+            self._currentSolar = result
             return true
         } catch {
             debugLog("Error converting lunar date: \(error)")
@@ -676,6 +709,42 @@ public final class KoreanLunarCalendar {
         }
         
         return result
+    }
+    
+    /// 간지 데이터 반환 (구조화된 형태)
+    /// - Parameter isSolarGapja: true면 양력 기준, false면 음력 기준 (기본값: false)
+    /// - Parameter isChinese: true면 한자, false면 한글 (기본값: false)
+    public func getGapJaDate(isSolarGapja: Bool = false, isChinese: Bool = false) -> GapJaDate? {
+        let gapja: (year: (Int, Int), month: (Int, Int), day: (Int, Int))?
+        
+        if isSolarGapja {
+            gapja = calculateSolarGapJa()
+        } else {
+            gapja = calculateGapJa()
+        }
+        
+        guard let gapja = gapja else { return nil }
+        
+        // Convert indices to strings (Korean or Chinese)
+        let cheonganArray = isChinese ? Self.chineseCheongan : Self.koreanCheongan
+        let ganjiArray = isChinese ? Self.chineseGanji : Self.koreanGanji
+        
+        let yearCheongan = cheonganArray[gapja.year.0]
+        let yearJiji = ganjiArray[gapja.year.1]
+        let monthCheongan = cheonganArray[gapja.month.0]
+        let monthJiji = ganjiArray[gapja.month.1]
+        let dayCheongan = cheonganArray[gapja.day.0]
+        let dayJiji = ganjiArray[gapja.day.1]
+        
+        let isIntercalation = !isSolarGapja && (currentLunar?.isLeapMonth == true)
+        
+        return GapJaDate(
+            year: GapJaElement(cheongan: yearCheongan, jiji: yearJiji),
+            month: GapJaElement(cheongan: monthCheongan, jiji: monthJiji),
+            day: GapJaElement(cheongan: dayCheongan, jiji: dayJiji),
+            isIntercalation: isIntercalation,
+            isSolarBased: isSolarGapja
+        )
     }
     
     /// Calculate Gap-Ja for solar date
