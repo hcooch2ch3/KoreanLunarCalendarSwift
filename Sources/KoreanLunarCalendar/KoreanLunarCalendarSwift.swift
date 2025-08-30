@@ -385,7 +385,7 @@ final class DataLoader {
     }
     
     /// Get solar absolute days from base year
-    func getSolarAbsDays(year: Int, month: Int, day: Int, useOptimization: Bool = false) throws -> Int {
+    func getSolarAbsDays(year: Int, month: Int, day: Int) throws -> Int {
         var days = try getSolarDaysBeforeBaseYear(year - 1)
         days += try getSolarDaysBeforeBaseMonth(year: year, month: month - 1) 
         days += day
@@ -687,7 +687,7 @@ public final class KoreanLunarCalendar {
         
         do {
             // Calculate absolute days from solar date
-            let solarAbsDays = try DataLoader.shared.getSolarAbsDays(year: solar.year, month: solar.month, day: solar.day, useOptimization: enableOptimization)
+            let solarAbsDays = try DataLoader.shared.getSolarAbsDays(year: solar.year, month: solar.month, day: solar.day)
             
             guard solarAbsDays > 0 else { return nil }
             
