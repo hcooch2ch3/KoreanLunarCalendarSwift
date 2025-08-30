@@ -347,4 +347,125 @@ final class KoreanLunarCalendarTests: XCTestCase {
             XCTAssertNotEqual(currentYear, nextYear, "Consecutive years should have different year Gap-Ja")
         }
     }
+    
+    func testPerformanceBenchmark() {
+        // Test performance without optimization
+        let normalCalendar = KoreanLunarCalendar(enableOptimization: false)
+        let optimizedCalendar = KoreanLunarCalendar(enableOptimization: true)
+        
+        let testDates = [
+            (2024, 6, 15), (2023, 12, 25), (2022, 8, 15), (2021, 10, 3),
+            (2020, 5, 23), (2019, 7, 8), (2018, 4, 12), (2017, 9, 30)
+        ]
+        
+        // Benchmark normal performance
+        let normalStart = CFAbsoluteTimeGetCurrent()
+        for (year, month, day) in testDates {
+            for _ in 0..<100 {
+                _ = normalCalendar.setSolarDate(year, month, day)
+                _ = normalCalendar.getGapJaString()
+            }
+        }
+        let normalTime = CFAbsoluteTimeGetCurrent() - normalStart
+        
+        // Benchmark optimized performance  
+        let optimizedStart = CFAbsoluteTimeGetCurrent()
+        for (year, month, day) in testDates {
+            for _ in 0..<100 {
+                _ = optimizedCalendar.setSolarDate(year, month, day)
+                _ = optimizedCalendar.getGapJaString()
+            }
+        }
+        let optimizedTime = CFAbsoluteTimeGetCurrent() - optimizedStart
+        
+        print("\nPerformance Benchmark Results:")
+        print("- Normal calendar: \(String(format: "%.4f", normalTime))s")
+        print("- Optimized calendar: \(String(format: "%.4f", optimizedTime))s")
+        print("- Performance improvement: \(String(format: "%.1f", normalTime / optimizedTime))x")
+        
+        // Optimized version should be faster or at least not significantly slower
+        XCTAssertLessThanOrEqual(optimizedTime, normalTime * 1.1, "Optimized version should not be significantly slower")
+    }
+    
+    func testOptimizationAccuracy() {
+        let normalCalendar = KoreanLunarCalendar(enableOptimization: false)
+        let optimizedCalendar = KoreanLunarCalendar(enableOptimization: true)
+        
+        let testDates = [
+            (2024, 1, 1), (2023, 6, 15), (2022, 12, 31),
+            (2021, 3, 8), (2020, 9, 25), (2019, 7, 14)
+        ]
+        
+        for (year, month, day) in testDates {
+            // Test solar -> lunar conversion
+            XCTAssertTrue(normalCalendar.setSolarDate(year, month, day))
+            XCTAssertTrue(optimizedCalendar.setSolarDate(year, month, day))
+            
+            XCTAssertEqual(normalCalendar.lunarIsoFormat(), optimizedCalendar.lunarIsoFormat(),
+                          "Lunar conversion should match for \(year)-\(month)-\(day)")
+            XCTAssertEqual(normalCalendar.getGapJaString(), optimizedCalendar.getGapJaString(),
+                          "Gap-Ja should match for \(year)-\(month)-\(day)")
+            
+            // Test lunar -> solar conversion if we have valid lunar date
+            if let lunar = normalCalendar.currentLunar {
+                XCTAssertTrue(normalCalendar.setLunarDate(lunar.year, lunar.month, lunar.day, lunar.isLeapMonth))
+                XCTAssertTrue(optimizedCalendar.setLunarDate(lunar.year, lunar.month, lunar.day, lunar.isLeapMonth))
+                
+                XCTAssertEqual(normalCalendar.solarIsoFormat(), optimizedCalendar.solarIsoFormat(),
+                              "Solar conversion should match for lunar \(lunar.year)-\(lunar.month)-\(lunar.day)")
+            }
+        }
+        
+        print("Optimization accuracy test passed - all results match!")
+    }
+    
+    func testSolarGapJaCalculation() {
+        let calendar = KoreanLunarCalendar()
+        
+        // Test solar Gap-Ja calculation for various dates
+        let testDates = [
+            (2024, 1, 1, "2024 New Year"),
+            (2023, 9, 29, "2023 Chuseok"),
+            (2022, 2, 1, "2022 Korean New Year"),
+            (2021, 5, 5, "2021 Children's Day"),
+            (2020, 1, 20, "2020 COVID start")
+        ]
+        
+        for (year, month, day, description) in testDates {
+            XCTAssertTrue(calendar.setSolarDate(year, month, day))
+            
+            let lunarGapja = calendar.getGapJaString(isSolarGapja: false)
+            let solarGapja = calendar.getGapJaString(isSolarGapja: true)
+            let lunarChinese = calendar.getChineseGapJaString(isSolarGapja: false)
+            let solarChinese = calendar.getChineseGapJaString(isSolarGapja: true)
+            
+            XCTAssertNotNil(lunarGapja, "\(description) - Lunar Gap-Ja should not be nil")
+            XCTAssertNotNil(solarGapja, "\(description) - Solar Gap-Ja should not be nil")
+            XCTAssertNotNil(lunarChinese, "\(description) - Lunar Chinese Gap-Ja should not be nil")
+            XCTAssertNotNil(solarChinese, "\(description) - Solar Chinese Gap-Ja should not be nil")
+            
+            print("\n\(description): \(year)-\(month)-\(day)")
+            print("- Lunar: \(calendar.lunarIsoFormat() ?? "nil")")
+            print("- Lunar Gap-Ja (Korean): \(lunarGapja ?? "nil")")
+            print("- Solar Gap-Ja (Korean): \(solarGapja ?? "nil")")
+            print("- Lunar Gap-Ja (Chinese): \(lunarChinese ?? "nil")")
+            print("- Solar Gap-Ja (Chinese): \(solarChinese ?? "nil")")
+            
+            // Solar and lunar Gap-Ja should generally be different (except for coincidences)
+            // Just validate they have proper format
+            if let solar = solarGapja {
+                XCTAssertTrue(solar.contains("년"), "\(description) - Solar Korean should contain '년'")
+                XCTAssertTrue(solar.contains("월"), "\(description) - Solar Korean should contain '월'")
+                XCTAssertTrue(solar.contains("일"), "\(description) - Solar Korean should contain '일'")
+                XCTAssertFalse(solar.contains("(윤)"), "\(description) - Solar Gap-Ja should not contain intercalation marker")
+            }
+            
+            if let solarChi = solarChinese {
+                XCTAssertTrue(solarChi.contains("年"), "\(description) - Solar Chinese should contain '年'")
+                XCTAssertTrue(solarChi.contains("月"), "\(description) - Solar Chinese should contain '月'")
+                XCTAssertTrue(solarChi.contains("日"), "\(description) - Solar Chinese should contain '日'")
+                XCTAssertFalse(solarChi.contains("(閏)"), "\(description) - Solar Gap-Ja should not contain intercalation marker")
+            }
+        }
+    }
 }
