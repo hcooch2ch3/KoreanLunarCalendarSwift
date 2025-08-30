@@ -4,12 +4,12 @@
 
 ## 개요
 
-KoreanLunarCalendarSwift는 한국천문연구원(KARI) 표준을 따라 양력과 음력 간의 정확한 변환 기능을 제공하는 Swift Package Manager 라이브러리입니다. 원본 [KoreanLunarCalendar Java 라이브러리](https://github.com/usingsky/KoreanLunarCalendar)를 Swift로 포팅했습니다.
+KoreanLunarCalendarSwift는 [한국천문연구원(KARI)](https://astro.kasi.re.kr/life/pageView/8) 표준을 따라 양력과 음력 간의 정확한 변환 기능을 제공하는 Swift Package Manager 라이브러리입니다. 원본 [KoreanLunarCalendar Java 라이브러리](https://github.com/usingsky/KoreanLunarCalendar)를 Swift로 포팅했습니다.
 
 ### 주요 특징
 
 - **한국천문연구원(KARI) 표준 기반**
-- **1000년부터 2050년까지 지원**  
+- **1000년부터 2050년까지 지원**
 - **음력 윤달(intercalation) 완벽 지원**
 - **간지(干支) 계산 기능 제공**
 - **iOS, macOS, tvOS, watchOS 네이티브 지원**
@@ -63,9 +63,9 @@ let success = calendar.setSolarDate(2024, 2, 10) // 2024년 2월 10일
 if success {
     // 변환된 음력 날짜 확인
     if let lunar = calendar.lunarIsoFormat() {
-        print("음력: \(lunar)")  // 출력: "2024-01-01"
+        print("음력: \(lunar)")  // 출력: "2024-01-01" (음력 2024년 1월 1일)
     }
-    
+
     // 간지 정보 확인
     if let gapja = calendar.getGapJaString() {
         print("간지: \(gapja)")  // 출력: "갑진년 을축월 갑자일"
@@ -102,12 +102,12 @@ calendar.setSolarDate(2024, 1, 1)
 
 // 한글 간지
 if let korean = calendar.getGapJaString() {
-    print("한글 간지: \(korean)")  // "계묘년 갑자월 갑자일"
+    print("한글 간지: \(korean)")  // "계묘년 갑자월 갑자일" (음력 2023년 11월 20일에 해당하는 음력간지)
 }
 
 // 한자 간지
 if let chinese = calendar.getChineseGapJaString() {
-    print("한자 간지: \(chinese)")  // "癸卯年 甲子月 甲子日"
+    print("한자 간지: \(chinese)")  // "癸卯年 甲子月 甲子日" (음력 2023년 11월 20일에 해당하는 음력간지 한자표기)
 }
 
 // 윤달의 경우 (윤) 또는 (閏) 표시
@@ -146,7 +146,7 @@ let calendar = KoreanLunarCalendar()
 // 2024년 설날 (양력 2024-02-10)
 calendar.setSolarDate(2024, 2, 10)
 print("양력: \(calendar.solarIsoFormat() ?? "")")     // "2024-02-10"
-print("음력: \(calendar.lunarIsoFormat() ?? "")")     // "2024-01-01" 
+print("음력: \(calendar.lunarIsoFormat() ?? "")")     // "2024-01-01"
 print("간지: \(calendar.getGapJaString() ?? "")")     // "갑진년 을축월 갑자일"
 ```
 
@@ -163,7 +163,7 @@ if let solarBirthday = calendar.solarIsoFormat() {
 }
 
 // 올해 음력 생일이 양력 몇 월 며칠인지 확인
-calendar.setLunarDate(2024, 3, 15, false) 
+calendar.setLunarDate(2024, 3, 15, false)
 if let thisYearBirthday = calendar.solarIsoFormat() {
     print("2024년 음력 생일: \(thisYearBirthday)")
 }
@@ -209,7 +209,7 @@ func getChineseGapJaString() -> String?
 // 현재 설정된 양력 날짜
 var currentSolar: SolarDate? { get }
 
-// 현재 설정된 음력 날짜  
+// 현재 설정된 음력 날짜
 var currentLunar: LunarDate? { get }
 ```
 
@@ -249,13 +249,14 @@ public struct LunarDate: Equatable, Sendable {
 ```
 배열 순서:
 - data[0] = 1000년 데이터
-- data[1] = 1001년 데이터  
+- data[1] = 1001년 데이터
 - data[1050] = 2050년 데이터
 ```
 
 #### 비트 인코딩 구조
 
 각 32비트 정수의 비트 구성:
+
 ```
 [태양력윤년(1비트)][총음력일수(9비트)][윤달월(4비트)][월패턴(12비트)]
 ```
@@ -286,6 +287,7 @@ let monthDays = ((yearData >> (12 - month)) & 0x1) == 1 ? 30 : 29
 #### 예시
 
 `2194016855` (1000년 데이터):
+
 - 이진수: `10000010100100000000100001010111`
 - 월 패턴: `000100001010111` → 1,4,6,8,10,12월이 큰달(30일)
 - 윤달월: `0000` → 윤달 없음
